@@ -1,48 +1,173 @@
-These are the steps and tools used to complete this exercise
+# BTLO — Secrets
 
-Looking at the token given, its a JWT so first we decode it. I used jwt.io
+## Overview
 
-This is what I got:
+These are the steps and tools used to complete this exercise.
 
+### Tools Used
+
+* [JWT.io](https://jwt.io/) — Decode and inspect the JWT
+* Python — Crack the weak JWT signing secret
+
+---
+
+## 1. Decode the JWT
+
+Looking at the token provided, we can identify it as a **JSON Web Token (JWT)**.
+
+I used **JWT.io** to decode the token.
+
+### Header
+
+```json
 {
   "typ": "JWT",
   "alg": "HS256"
 }
+```
 
+### Payload
+
+```json
 {
   "flag": "BTL{_4_Eyes}",
   "iat": 90000000,
   "name": "GreatExp",
   "admin": true
 }
+```
 
-We also see that ther is no proper signature verification, so we will need to find that later
+The header shows that the token uses the **HS256** signing algorithm.
 
-Let's start working through the questions
+The payload also contains an `admin` claim set to `true`, indicating that this is currently a high-privilege token.
 
-Question 1: Can you identify the name of the token?
-Can be found in the header identified by "typ"
+---
 
-Question 2: What is the structure of this token?
-All JWTs follow the same structure header.payload.signature
+# Questions
 
-Question 3: What is the hint you found from this token?
-Found directly in the payload
+## Question 1: Can you identify the name of the token?
 
-Question 4: What is the secret?
-We will need to crack the JWT to find this. I will be using a python script name cracker.py
-From the hint we know that the secret will be 4 characters long
+The token type can be found in the JWT header under the `typ` field.
 
-This is what the code will do
+```json
+"typ": "JWT"
+```
 
-Takes the JWT.
-Splits it into header/payload/signature.
-Generate possible secrets
-Calculates HMAC-SHA256 for each candidate.
-Compares the result against the JWT's signature.
-Prints the matching secret.
+**Answer:** `JWT`
 
-After the secret is pulled we can move to question 5
+---
 
-Question 5: Can you generate a new verified signature ticket with a low privilege?
-It wants a low privilege ticket so admin:true needs to become admin:false. Afterwards use the secret found in question 4 then go back to jwt.io  and you got the key!
+## Question 2: What is the structure of this token?
+
+JWTs follow the structure:
+
+```text
+HEADER.PAYLOAD.SIGNATURE
+```
+
+The three sections are separated by periods (`.`).
+
+* **Header** — Contains information such as the token type and signing algorithm.
+* **Payload** — Contains the claims/data stored in the token.
+* **Signature** — Used to verify that the token has not been modified.
+
+---
+
+## Question 3: What is the hint you found from this token?
+
+The hint is found directly in the payload:
+
+```json
+"flag": "BTL{_4_Eyes}"
+```
+
+**Answer:** `_4_Eyes`
+
+---
+
+## Question 4: What is the secret?
+
+The JWT uses **HS256**, meaning the signature is generated using a shared secret.
+
+The secret is not directly visible when decoding the JWT, so it needs to be recovered by testing possible secrets against the existing signature.
+
+I used a Python script named `cracker.py` to perform this process.
+
+### What the script does
+
+1. Takes the JWT.
+2. Splits it into the header, payload, and signature.
+3. Generates possible 4-character secrets based on the challenge requirements.
+4. Calculates the HMAC-SHA256 signature using each candidate secret.
+5. Base64URL-encodes the calculated signature.
+6. Compares it against the original JWT signature.
+7. Prints the matching secret when one is found.
+
+Conceptually:
+
+```text
+Candidate Secret
+       ↓
+HMAC-SHA256
+       ↓
+Base64URL Encode
+       ↓
+Compare with JWT Signature
+       ↓
+Match = Correct Secret
+```
+
+The recovered secret can then be used to create a new valid JWT signature.
+
+---
+
+## Question 5: Can you generate a new verified signature ticket with a low privilege?
+
+The challenge asks for a **low-privilege** ticket.
+
+The original payload contains:
+
+```json
+"admin": true
+```
+
+This needs to be changed to:
+
+```json
+"admin": false
+```
+
+After modifying the payload, the original signature is no longer valid because the contents of the token have changed.
+
+Using the secret recovered in Question 4, a new **HS256 signature** can be generated for the modified payload.
+
+I used **JWT.io** to:
+
+1. Change `admin` from `true` to `false`.
+2. Enter the recovered signing secret.
+3. Generate the new signature.
+4. Verify that the resulting JWT is valid.
+
+The resulting token is the required **low-privilege ticket**.
+
+---
+
+## Key Takeaway
+
+This exercise demonstrates how a weak JWT signing secret can compromise the integrity of a token.
+
+Even though the JWT payload can be decoded without the secret, the signature normally prevents an attacker from modifying the payload and creating a valid token.
+
+If the signing secret is weak enough to recover, an attacker can:
+
+```text
+Recover Secret
+      ↓
+Modify JWT Claims
+      ↓
+Generate New Signature
+      ↓
+Create Valid Modified JWT
+```
+
+In this case, the attacker can change the `admin` claim from `true` to `false` and generate a valid low-privilege token.
